@@ -1,3 +1,4 @@
+
 package com.apptcheck.agent
 
 import android.Manifest
@@ -27,16 +28,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope // Added for 2026 scope management
 import com.apptcheck.agent.scheduler.StrikeReceiver
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import rust_engine.* // Generated UniFFI bindings
+import rust_engine.* 
 
 class MainActivity : ComponentActivity() {
     private val agent = BookingAgent()
     private val logs = mutableStateListOf<String>()
 
-    // Permission Launchers
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -60,7 +61,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Background loop to poll Rust Engine status for the UI
         lifecycleScope.launch {
             while (true) {
                 val status = agent.getStatus()
@@ -75,23 +75,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkAndRequestPermissions() {
-        // 1. Notification Permission (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
 
-        // 2. Exact Alarm Permission (Android 12+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
             if (!alarmManager.canScheduleExactAlarms()) {
                 val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-                startIntent(intent)
+                startActivity(intent)
             }
         }
 
-        // 3. Battery Optimization (Request Ignore)
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
@@ -116,7 +113,6 @@ class MainActivity : ComponentActivity() {
 
         val triggerTime = System.currentTimeMillis() + delayMs
         
-        // Use setExactAndAllowWhileIdle to wake up even in Doze mode
         alarmManager.setExactAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
             triggerTime,
@@ -141,7 +137,6 @@ fun DashboardScreen(agent: BookingAgent, logs: List<String>, onSchedule: (String
                 Text("Engine Controls", style = MaterialTheme.typography.titleMedium)
                 Button(
                     onClick = { 
-                        // Demo Strike: Schedules a run in 30 seconds
                         val dummyRunId = "run-${System.currentTimeMillis()}"
                         onSchedule(dummyRunId, configText, 30000L) 
                     },
