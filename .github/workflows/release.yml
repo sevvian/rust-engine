@@ -35,8 +35,8 @@ jobs:
           targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android, i686-linux-android
 
       - name: Install UniFFI Bindgen CLI
-        # NOTE: 0.25.2 is the verified latest version for the hyphenated binary crate on crates.io
-        run: cargo install uniffi-bindgen --version 0.25.2
+        # 0.24.3 (underscore) is the stable binary crate with perfect library parity
+        run: cargo install uniffi_bindgen --version 0.24.3
 
       - name: Setup Android NDK
         run: |
@@ -73,6 +73,7 @@ jobs:
           body: |
             ## High Fidelity Appointment Agent Build
             - Rust Core: BoringSSL / rquest Mimicry
+            - Stable UniFFI 0.24.3 Stack
             - Microsecond Precision Strike Logic
             - Android 8-16 Compatibility
             - Encrypted Credential Storage
