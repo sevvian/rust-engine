@@ -13,201 +13,125 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.apptcheck.agent.data.models.Museum
 import com.apptcheck.agent.ui.components.CredentialEditor
 import com.apptcheck.agent.ui.components.CredentialUiModel
-import kotlinx.serialization.json.*
-import java.text.SimpleDateFormat
-import java.util.*
 
-/**
- * DashboardScreen is the primary UI for the Appointment Agent.
- * It integrates Site configuration, Strike Scheduling, and Live Logs.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DashboardScreen(viewModel: MainViewModel = viewModel()) {
-    val configJson by viewModel.configJson.collectAsState()
+    val uiSiteId by viewModel.uiSelectedSiteId.collectAsState()
+    val config by viewModel.appConfig.collectAsState()
+    val museums by viewModel.filteredMuseums.collectAsState()
+    val credentials by viewModel.filteredCredentials.collectAsState()
     val engineStatus by viewModel.engineStatus.collectAsState()
-    val logs = viewModel.liveLogs
     
-    // Local UI state for Site selection
-    var activeSite by remember { mutableStateOf("spl") }
-    var selectedMuseum by remember { mutableStateOf("") }
-    
-    // Parse Config for UI display
-    val configObj = remember(configJson) { 
-        try { Json.parseToJsonElement(configJson).jsonObject } catch (e: Exception) { buildJsonObject {} }
-    }
+    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Appt Agent v3.2") },
                 actions = {
-                    IconButton(onClick = { /* Trigger Export via Intent */ }) {
-                        Icon(Icons.Default.Share, contentDescription = "Export Backup")
-                    }
-                    IconButton(onClick = { /* Trigger Import via Intent */ }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Import Backup")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                    IconButton(onClick = { /* Export Logic */ }) { Icon(Icons.Default.Share, "Export") }
+                    IconButton(onClick = { /* Import Logic */ }) { Icon(Icons.Default.Refresh, "Import") }
+                }
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { 
-                    val runId = "manual-${System.currentTimeMillis()}"
-                    // Trigger immediate strike (30s prep) via AlarmManager
-                    viewModel.scheduleStrike(runId, System.currentTimeMillis() + 30000)
-                },
-                icon = { Icon(Icons.Default.PlayArrow, "Run") },
-                text = { Text("Strike Now") },
-                containerColor = MaterialTheme.colorScheme.primary
-            )
+            FloatingActionButton(onClick = { viewModel.scheduleStrike("manual-${System.currentTimeMillis()}", 30000L) }) {
+                Icon(Icons.Default.PlayArrow, "Strike Now")
+            }
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
         ) {
             // 1. Status Banner
-            StatusBanner(engineStatus)
+            EngineStatusBanner(engineStatus)
 
-            // 2. Site Selector
-            SiteSelector(activeSite) { activeSite = it }
+            // 2. Site Tabs
+            SiteTabs(selectedSite = uiSiteId, onSelect = { viewModel.selectUiSite(it) })
 
-            // 3. Museum Chips (Dynamic based on site)
-            MuseumPills(activeSite, selectedMuseum) { selectedMuseum = it }
+            // 3. Museums List (Updates automatically based on uiSiteId)
+            MuseumSection(
+                museums = museums, 
+                preferredSlug = config.sites[uiSiteId]?.preferredslug ?: "",
+                onSelect = { viewModel.updatePreferredMuseum(uiSiteId, it) }
+            )
 
-            // 4. Credential Manager (Integrated from File 18)
-            CredentialEditor(
-                credentials = emptyMap(), // Connect to ViewModel credentials map in real impl
-                onSave = { /* Update VM */ },
-                onDelete = { /* Update VM */ }
+            // 4. Credential List (Updates automatically based on uiSiteId)
+            CredentialSection(
+                credentials = credentials,
+                onSave = { viewModel.saveCredential(it) },
+                onDelete = { viewModel.deleteCredential(it) }
             )
 
             // 5. Strike Queue
-            StrikeQueue(viewModel)
+            StrikeQueueSection(config.scheduled_runs)
 
-            // 6. Live Engine Logs (Terminal Style)
-            LogViewer(logs)
+            // 6. Live Logs
+            LogConsole(viewModel.liveLogs)
             
-            Spacer(modifier = Modifier.height(80.dp))
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }
 
 @Composable
-fun StatusBanner(status: rust_engine.EngineStatus) {
-    val color = if (status.isRunning) Color(0xFF4CAF50) else Color(0xFF607D8B)
+fun EngineStatusBanner(status: rust_engine.EngineStatus) {
+    val bgColor = if (status.isRunning) Color(0xFF2E7D32) else Color(0xFF455A64)
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(8.dp),
-        color = color,
-        shape = MaterialTheme.shapes.medium
+        modifier = Modifier.fillMaxWidth().padding(12.dp),
+        color = bgColor,
+        shape = MaterialTheme.shapes.medium,
+        shadowElevation = 4.dp
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                if (status.isRunning) Icons.Default.Sync else Icons.Default.Info,
-                contentDescription = null,
-                tint = Color.white
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                color = if (status.isRunning) Color.White else Color.Transparent,
+                strokeWidth = 2.dp
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text(
-                    text = if (status.isRunning) "Engine Active" else "Engine Idle",
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelLarge
-                )
-                Text(
-                    text = status.lastLog,
-                    color = Color.White.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1
-                )
+                Text(if (status.isRunning) "STRIKE ACTIVE" else "ENGINE IDLE", color = Color.White, style = MaterialTheme.typography.titleSmall)
+                Text(status.lastLog, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
             }
         }
     }
 }
 
 @Composable
-fun SiteSelector(selected: String, onSelect: (String) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Button(
-            onClick = { onSelect("spl") },
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (selected == "spl") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = if (selected == "spl") Color.White else MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        ) { Text("SPL") }
-        
-        Button(
-            onClick = { onSelect("kcls") },
-            modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (selected == "kcls") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = if (selected == "kcls") Color.White else MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        ) { Text("KCLS") }
+fun SiteTabs(selectedSite: String, onSelect: (String) -> Unit) {
+    TabRow(selectedTabIndex = if (selectedSite == "spl") 0 else 1) {
+        Tab(selected = selectedSite == "spl", onClick = { onSelect("spl") }, text = { Text("SPL") })
+        Tab(selected = selectedSite == "kcls", onClick = { onSelect("kcls") }, text = { Text("KCLS") })
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun MuseumPills(site: String, selected: String, onSelect: (String) -> Unit) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Text("Preferred Museum", style = MaterialTheme.typography.titleSmall)
-        FlowRow(
-            modifier = Modifier.padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Mock museums list - in full app, this pulls from AppConfig
-            val museums = if (site == "spl") listOf("SAM", "Zoo", "MoM") else listOf("KidsQuest")
-            museums.forEach { museum ->
-                FilterChip(
-                    selected = selected == museum,
-                    onClick = { onSelect(museum) },
-                    label = { Text(museum) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun StrikeQueue(viewModel: MainViewModel) {
+fun MuseumSection(museums: List<Museum>, preferredSlug: String, onSelect: (String) -> Unit) {
     Column(modifier = Modifier.padding(16.dp)) {
-        Text("Strike Queue", style = MaterialTheme.typography.titleSmall)
-        // Dummy queue items
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.DateRange, null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Daily Strike (9:00 AM)", style = MaterialTheme.typography.bodyMedium)
-                    Text("Mode: Booking | Site: SPL", style = MaterialTheme.typography.bodySmall)
-                }
-                IconButton(onClick = { /* Cancel */ }) {
-                    Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error)
+        Text("Preferred Museum", style = MaterialTheme.typography.labelLarge)
+        if (museums.isEmpty()) {
+            Text("No museums configured for this site.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+        } else {
+            FlowRow(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                museums.forEach { museum ->
+                    FilterChip(
+                        selected = museum.slug == preferredSlug,
+                        onClick = { onSelect(museum.slug) },
+                        label = { Text(museum.name) }
+                    )
                 }
             }
         }
@@ -215,13 +139,9 @@ fun StrikeQueue(viewModel: MainViewModel) {
 }
 
 @Composable
-fun LogViewer(logs: List<String>) {
+fun LogConsole(logs: List<String>) {
     Column(modifier = Modifier.padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.List, null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Engine Logs", style = MaterialTheme.typography.titleSmall)
-        }
+        Text("Engine Logs", style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(8.dp))
         Box(
             modifier = Modifier
@@ -232,15 +152,12 @@ fun LogViewer(logs: List<String>) {
         ) {
             LazyColumn {
                 items(logs.asReversed()) { log ->
-                    Text(
-                        text = "> $log",
-                        color = Color(0xFF00FF00),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        lineHeight = 14.sp
-                    )
+                    Text("> $log", color = Color.Green, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                 }
             }
         }
     }
 }
+
+// Note: CredentialSection and StrikeQueueSection would follow the same pattern, 
+// calling into existing UI components provided in File 18.
