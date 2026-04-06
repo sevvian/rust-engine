@@ -1,27 +1,20 @@
 ```
 # Build artifacts
 build/
-
-# Gradle
-.gradle/
-!gradle.properties
-!gradlew
-!gradlew.bat
-
-# Android
 *.apk
 *.aar
-*.iml
-local.properties
+*.jar
+*.class
+
+# Dependencies
+.gradle/
+node_modules/
+vendor/
 
 # Environment
 .env
 .env.local
 .env.*
-
-# Dependencies
-node_modules/
-vendor/
 
 # Logs
 *.log
@@ -29,4 +22,46 @@ vendor/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python (if applicable)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Compiled and binary files
+*.exe
+*.dll
+*.so
+*.dylib
+*.o
+*.obj
+*.a
+*.lib
+
+# Archives
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.gz
+*.rar
+*.7z
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Testing
+*.tmp
+*.temp
 ```

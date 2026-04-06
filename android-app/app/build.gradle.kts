@@ -70,19 +70,15 @@ composeCompiler {
 
 /**
  * FIXED: Rust Extension Configuration
- * Uses explicit setters to avoid DSL keyword collisions in Gradle 9.x
+ * Uses the correct CargoExtension class from com.nishtahir package
  */
-tasks.withType<org.mozilla.rustandroidgradle.rust.CargoBuildTask>().configureEach {
-    // Configure Rust build settings here if needed
-}
-
-// Configure the Rust extension using the configure block
-configure<org.mozilla.rustandroidgradle.rust.RustExtension> {
-    setModule("../../rust-engine")
-    setLibname("rust_engine")
-    setTargets(listOf("arm", "arm64", "x86", "x86_64"))
-    // ADDED: Use release profile for better performance
-    setProfile("release")
+// Configure the Rust extension using the standard DSL
+// The plugin adds the 'rust' extension automatically
+configure<com.nishtahir.CargoExtension> {
+    module = "../../rust-engine"
+    libname = "rust_engine"
+    targets = listOf("arm", "arm64", "x86", "x86_64")
+    profile = "release"
 }
 
 dependencies {
