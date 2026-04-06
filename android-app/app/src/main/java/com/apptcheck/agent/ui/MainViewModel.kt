@@ -72,12 +72,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectUiSite(siteId: String) { _uiSelectedSiteId.value = siteId }
+    fun selectUiSite(siteId: String) {
+        _uiSelectedSiteId.value = siteId
+    }
 
-    /**
-     * Logic to schedule a future strike with specific Timezone support.
-     * Converts Local Selection + ZoneID -> UTC for the Rust Engine.
-     */
     fun createScheduledRun(
         siteId: String,
         museumSlug: String,
@@ -92,7 +90,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             id = UUID.randomUUID().toString(),
             sitekey = siteId,
             museumslug = museumSlug,
-            droptime = utcInstant.toString(), // Store as ISO-8601 UTC string
+            droptime = utcInstant.toString(),
             mode = mode,
             credentialid = appConfig.value.selected_credential
         )
@@ -101,7 +99,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val updatedRuns = current.scheduled_runs.toMutableList().apply { add(newRun) }
         saveFullConfig(current.copy(scheduled_runs = updatedRuns))
 
-        // Schedule the Android Alarm 30s before the UTC drop time
         val triggerTimeMs = utcInstant.toEpochMilli() - current.pre_warm_offset_ms
         scheduleAlarm(newRun.id, triggerTimeMs)
     }
@@ -131,6 +128,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val intent = Intent(context, StrikeReceiver::class.java).apply { action = "com.apptcheck.ACTION_STRIKE_ALARM" }
         val pendingIntent = PendingIntent.getBroadcast(context, runId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         alarmManager.cancel(pendingIntent)
+
+        viewModelScope.launch {
+            if (_engineStatus.value.currentRunId == runId) {
+                agent.stop()
+            }
+        }
     }
 
     fun saveCredential(cred: Credential) {
@@ -157,4 +160,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         storage.saveConfig(raw)
         _configJsonRaw.value = raw
     }
+
+    fun restoreFromBackup(payload: String) {
+        storage.restoreBackup(payload)
+        _configJsonRaw.value = payload
+    }
+
+    fun getBackupPayload(): String = storage.getBackupData()
 }
