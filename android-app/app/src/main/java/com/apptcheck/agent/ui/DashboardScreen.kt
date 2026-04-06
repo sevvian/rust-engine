@@ -19,9 +19,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.apptcheck.agent.data.models.Museum
 import com.apptcheck.agent.data.models.ScheduledRun
-import com.apptcheck.agent.ui.components.CredentialEditor
-import com.apptcheck.agent.ui.components.CredentialUiModel
-import java.text.SimpleDateFormat
+import com.apptcheck.agent.ui.components.*
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -33,19 +32,16 @@ fun DashboardScreen(viewModel: MainViewModel = viewModel()) {
     val credentials by viewModel.filteredCredentials.collectAsState()
     val engineStatus by viewModel.engineStatus.collectAsState()
     
+    var showScheduleDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Appt Agent v3.2") },
+                title = { Text("Appt Agent v3.3") },
                 actions = {
-                    IconButton(onClick = { /* Export Logic in Phase 4 */ }) { 
-                        Icon(Icons.Default.Share, contentDescription = "Export") 
-                    }
-                    IconButton(onClick = { /* Import Logic in Phase 4 */ }) { 
-                        Icon(Icons.Default.Refresh, contentDescription = "Import") 
-                    }
+                    IconButton(onClick = { /* Export Logic via Intent */ }) { Icon(Icons.Default.Share, "Export") }
+                    IconButton(onClick = { /* Import Logic via Intent */ }) { Icon(Icons.Default.Refresh, "Import") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -53,11 +49,18 @@ fun DashboardScreen(viewModel: MainViewModel = viewModel()) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.scheduleStrike("manual-${System.currentTimeMillis()}", 30000L) },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Strike Now")
+            Column(horizontalAlignment = Alignment.End) {
+                SmallFloatingActionButton(
+                    onClick = { showScheduleDialog = true },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                ) { Icon(Icons.Default.DateRange, "Schedule") }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                FloatingActionButton(
+                    onClick = { viewModel.scheduleStrike("manual-${System.currentTimeMillis()}", 30000L) },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) { Icon(Icons.Default.PlayArrow, "Strike Now") }
             }
         }
     ) { padding ->
@@ -67,13 +70,10 @@ fun DashboardScreen(viewModel: MainViewModel = viewModel()) {
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
-            // 1. Status Banner
             EngineStatusBanner(engineStatus)
-
-            // 2. Site Tabs
+            
             SiteTabs(selectedSite = uiSiteId, onSelect = { viewModel.selectUiSite(it) })
-
-            // 3. Museums List (Reactive to uiSiteId)
+            
             MuseumSection(
                 museums = museums, 
                 preferredSlug = config.sites[uiSiteId]?.preferredslug ?: "",
@@ -82,7 +82,6 @@ fun DashboardScreen(viewModel: MainViewModel = viewModel()) {
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-            // 4. Credential List (Integrated from File 18 components)
             CredentialSection(
                 credentials = credentials.map { 
                     CredentialUiModel(it.id, it.name, it.username, it.password, it.email, it.site) 
@@ -99,7 +98,6 @@ fun DashboardScreen(viewModel: MainViewModel = viewModel()) {
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-            // 5. Strike Queue (List of upcoming runs)
             StrikeQueueSection(
                 runs = config.scheduled_runs.filter { it.sitekey == uiSiteId },
                 onCancel = { id -> viewModel.cancelRun(id) }
@@ -107,11 +105,20 @@ fun DashboardScreen(viewModel: MainViewModel = viewModel()) {
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-            // 6. Live Logs (Terminal Console)
             LogConsole(viewModel.liveLogs)
             
-            Spacer(modifier = Modifier.height(100.dp))
+            Spacer(modifier = Modifier.height(120.dp))
         }
+    }
+
+    if (showScheduleDialog) {
+        ScheduleStrikeDialog(
+            onDismiss = { showScheduleDialog = false },
+            onConfirm = { ldt, zone, mode ->
+                viewModel.createScheduledRun(uiSiteId, config.sites[uiSiteId]?.preferredslug ?: "", ldt, zone, mode)
+                showScheduleDialog = false
+            }
+        )
     }
 }
 
@@ -167,7 +174,7 @@ fun MuseumSection(museums: List<Museum>, preferredSlug: String, onSelect: (Strin
         Text("Preferred Museum", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         if (museums.isEmpty()) {
             Text(
-                "No museums configured for this site. Check Admin settings.", 
+                "No museums configured for this site.", 
                 style = MaterialTheme.typography.bodySmall, 
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -194,7 +201,6 @@ fun CredentialSection(
     onSave: (CredentialUiModel) -> Unit,
     onDelete: (String) -> Unit
 ) {
-    // Reuses the implementation from File 18
     CredentialEditor(
         credentials = credentials,
         onSave = onSave,
@@ -209,7 +215,6 @@ fun StrikeQueueSection(runs: List<ScheduledRun>, onCancel: (String) -> Unit) {
         if (runs.isEmpty()) {
             Text("No strikes scheduled.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
         } else {
-            val dateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
             runs.forEach { run ->
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -220,8 +225,10 @@ fun StrikeQueueSection(runs: List<ScheduledRun>, onCancel: (String) -> Unit) {
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(run.museumslug, style = MaterialTheme.typography.titleSmall)
+                            val instant = java.time.Instant.parse(run.droptime)
+                            val local = instant.atZone(java.time.ZoneId.systemDefault())
                             Text(
-                                "Drop: ${dateFormat.format(Date(run.droptime.toEpochSecond() * 1000))}", 
+                                "Drop: ${local.format(java.time.format.DateTimeFormatter.ofPattern("MMM dd, HH:mm"))}", 
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
