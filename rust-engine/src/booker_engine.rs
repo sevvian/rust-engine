@@ -95,7 +95,7 @@ impl<'a> BookerEngine<'a> {
         let result_text = submit_resp.text().await?;
 
         // 6. Verify success based on indicators
-        if result_text.contains(&self.site.successindicator) || 
+        if result_text.contains(&self.site.successindicator) ||
            result_text.contains("The following Digital Pass reservation was made:") {
             info!("Booking SUCCESSFUL for {}", availability.date);
             Ok(())
@@ -112,7 +112,7 @@ impl<'a> BookerEngine<'a> {
     async fn handle_login(&self, form_element: scraper::ElementRef<'_>, current_url: &str) -> Result<()> {
         let auth_id = form_element.select(&Selector::parse("input[name='auth_id']").unwrap())
             .next().and_then(|e| e.value().attr("value")).unwrap_or("");
-        
+
         let login_url_val = form_element.select(&Selector::parse("input[name='login_url']").unwrap())
             .next().and_then(|e| e.value().attr("value")).unwrap_or("");
 
@@ -127,7 +127,7 @@ impl<'a> BookerEngine<'a> {
         login_data.insert(self.site.loginform.passwordfield.clone(), self.credential.password.clone());
 
         let action = self.extract_action_url(form_element, current_url);
-        
+
         let resp = self.client.inner.post(&action)
             .form(&login_data)
             .header("Referer", current_url)
@@ -148,7 +148,7 @@ impl<'a> BookerEngine<'a> {
         if action.starts_with("http") {
             action.to_string()
         } else if action.starts_with('/') {
-            let base = reqwest::Url::parse(current_url).unwrap();
+            let base = wreq::Url::parse(current_url).unwrap();
             format!("{}://{}{}", base.scheme(), base.host_str().unwrap_or(""), action)
         } else {
             format!("{}/{}", current_url.trim_end_matches('/'), action)
