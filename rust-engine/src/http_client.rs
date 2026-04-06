@@ -13,29 +13,23 @@ pub struct MimicClient {
 
 impl MimicClient {
     /// Creates a new client instance with a randomized high-fidelity profile.
-    /// timeout_ms: Maximum time to wait for a response.
     pub fn new(timeout_ms: u64) -> Result<Self> {
-        // Selection of modern, high-reputation browser profiles.
-        // These profiles configure TLS extensions, cipher suites, and HTTP/2 settings
-        // to match the specific User-Agent exactly.
+        // Selection of modern browser profiles supported in rquest 0.31.0
         let profiles = vec![
+            (Impersonate::Chrome123, "Chrome 123 Windows"),
+            (Impersonate::Safari17_2_1, "Safari 17.2.1 (MacOS)"),
+            (Impersonate::Edge122, "Edge 122 Windows"),
             (Impersonate::Chrome120, "Chrome 120 Windows"),
-            (Impersonate::SafariIos17_2, "Safari iOS 17.2 (iPhone)"),
-            (Impersonate::Edge120, "Edge 120 Windows"),
-            (Impersonate::Chrome119, "Chrome 119 Windows"),
         ];
 
         let mut rng = rand::thread_rng();
-        // Unwrap is safe here as the profiles list is non-empty.
         let (impersonate_type, name) = profiles.choose(&mut rng).unwrap();
 
         // Build the client with the chosen impersonation identity.
         let client = Client::builder()
             .impersonate(*impersonate_type)
             .timeout(Duration::from_millis(timeout_ms))
-            // Enable cookie_store to maintain session state across requests (Login -> Book).
             .cookie_store(true)
-            // Enforce standard compression support expected by modern WAFs.
             .gzip(true)
             .brotli(true)
             .build()?;
