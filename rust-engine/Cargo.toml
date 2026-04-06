@@ -1,6 +1,6 @@
 [package]
 name = "rust-engine"
-version = "3.5.0"
+version = "3.5.1"
 edition = "2021"
 description = "High-performance native booking engine for Android"
 
@@ -17,9 +17,11 @@ required-features = ["uniffi/cli"]
 [dependencies]
 tokio = { version = "1.36", features = ["full", "rt", "macros"] }
 futures = "0.3"
-rquest = { version = "0.20", features = ["boringssl", "socks5", "gzip", "brotli"] }
 
-# Modern 0.28.1 stack with CLI feature enabled
+# UPDATED: Moved from yanked 0.20 to stable 0.31.0
+rquest = { version = "0.31.0", features = ["boringssl", "socks5", "gzip", "brotli"] }
+
+# Unified 0.28.1 Stack
 uniffi = { version = "0.28.1", features = ["tokio", "cli"] }
 
 serde = { version = "1.0", features = ["derive"] }
