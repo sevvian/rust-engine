@@ -1,1 +1,43 @@
-Nothing should be ignored based on the provided file changes, as they consist only of source/config files (.yml, .md) without any build artifacts, dependencies, or temporary files.
+```
+# Gradle
+.gradle/
+build/
+target/
+
+# Android
+*.apk
+*.aar
+*.dex
+
+# Dependencies
+node_modules/
+.libs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (if applicable)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+```

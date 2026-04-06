@@ -14,10 +14,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: android-app
-
     steps:
     - uses: actions/checkout@v4
 
@@ -54,8 +50,12 @@ jobs:
         gradle-version: wrapper
         build-root-directory: android-app
 
+    - name: Make Gradlew Executable
+      run: chmod +x android-app/gradlew
+
     - name: Build with Gradle
       run: ./gradlew assembleDebug --stacktrace
+      working-directory: android-app
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4

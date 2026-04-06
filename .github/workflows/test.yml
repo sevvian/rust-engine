@@ -45,10 +45,6 @@ jobs:
   test-android:
     runs-on: ubuntu-latest
     
-    defaults:
-      run:
-        working-directory: android-app
-    
     steps:
     - uses: actions/checkout@v4
     
@@ -64,8 +60,13 @@ jobs:
         gradle-version: wrapper
         build-root-directory: android-app
     
+    - name: Make Gradlew Executable
+      run: chmod +x android-app/gradlew
+    
     - name: Run Android Unit Tests
       run: ./gradlew test --stacktrace
+      working-directory: android-app
     
     - name: Run Lint Checks
       run: ./gradlew lint
+      working-directory: android-app
