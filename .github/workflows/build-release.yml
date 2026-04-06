@@ -1,18 +1,16 @@
-name: Android CI (Rust + Kotlin)
+name: Build & Release (Tagged)
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  # Trigger on version tags (e.g., v3.5.2)
   push:
     tags:
       - 'v*'
 
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
     - uses: actions/checkout@v4
@@ -53,13 +51,21 @@ jobs:
     - name: Make Gradlew Executable
       run: chmod +x android-app/gradlew
 
-    - name: Build with Gradle
-      run: ./gradlew assembleDebug --stacktrace
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --stacktrace
       working-directory: android-app
 
-    - name: Upload Debug APK
-      uses: actions/upload-artifact@v4
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug
+      working-directory: android-app
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
       with:
-        name: app-debug
-        path: android-app/app/build/outputs/apk/debug/*.apk
-        if-no-files-found: error
+        files: |
+          android-app/app/build/outputs/apk/release/*.apk
+          android-app/app/build/outputs/apk/debug/*.apk
+        generate_release_notes: true
+        draft: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

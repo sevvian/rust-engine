@@ -1,33 +1,27 @@
-name: Android CI (Rust + Kotlin)
+name: Test Suite
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # Trigger on version tags (e.g., v3.5.2)
-  push:
-    tags:
-      - 'v*'
 
 jobs:
-  build:
+  test-rust:
     runs-on: ubuntu-latest
-
+    
+    defaults:
+      run:
+        working-directory: rust-engine
+    
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
+    
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android, i686-linux-android
-
+    
     - name: Cache Cargo
       uses: actions/cache@v4
       with:
@@ -38,28 +32,41 @@ jobs:
           ~/.cargo/git/db/
           rust-engine/target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('rust-engine/Cargo.lock') }}
+    
+    - name: Run Rust Tests
+      run: cargo test --all-features
+    
+    - name: Check Formatting
+      run: cargo fmt --check
+    
+    - name: Run Clippy Linter
+      run: cargo clippy -- -D warnings
 
-    - name: Setup Android NDK
-      uses: nttld/setup-ndk@v1
+  test-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
       with:
-        ndk-version: r27
-
+        java-version: '17'
+        distribution: 'temurin'
+    
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: wrapper
         build-root-directory: android-app
-
+    
     - name: Make Gradlew Executable
       run: chmod +x android-app/gradlew
-
-    - name: Build with Gradle
-      run: ./gradlew assembleDebug --stacktrace
+    
+    - name: Run Android Unit Tests
+      run: ./gradlew test --stacktrace
       working-directory: android-app
-
-    - name: Upload Debug APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug
-        path: android-app/app/build/outputs/apk/debug/*.apk
-        if-no-files-found: error
+    
+    - name: Run Lint Checks
+      run: ./gradlew lint
+      working-directory: android-app
