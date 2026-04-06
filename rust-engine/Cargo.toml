@@ -1,31 +1,25 @@
 
 [package]
 name = "rust-engine"
-version = "3.6.0" # Bumped version for 2026 stack update
+version = "3.6.0" 
 edition = "2021"
 description = "High-performance native booking engine for Android"
 
 [lib]
-crate-type =["cdylib", "staticlib"]
+crate-type = ["cdylib", "staticlib"]
 name = "rust_engine"
 
-# Option 2: Define the bindgen tool as a binary within the project
 [[bin]]
 name = "uniffi-bindgen"
 path = "src/bin/uniffi-bindgen.rs"
-required-features =["uniffi/cli"]
+required-features = ["uniffi/cli"]
 
 [dependencies]
-# Async runtime (Updated per 2026 report)
 tokio = { version = "1.45", features = ["full", "tracing"] }
 futures = "0.3"
 
-# Core Networking & Browser Mimicry
-# NOTE: The report recommends `impersonate-rs`, but it requires `libcurl-impersonate` (C library).
-# Cross-compiling C libraries for Android NDK across 4 architectures is highly problematic.
-# We instead use the report's pure-Rust alternative `reqwest-impersonate` (now known as `rquest`),
-# which guarantees Android compatibility.
-rquest = { version = "0.31.0", features =["boringssl", "socks5", "gzip", "brotli"] }
+# Pure-Rust browser mimicry for 2026
+rquest = { version = "0.31.0", features = ["boringssl", "socks5", "gzip", "brotli"] }
 
 # Unified 0.28.1 Stack
 uniffi = { version = "0.28.1", features = ["tokio", "cli"] }
@@ -34,31 +28,29 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 
-# HTML Parsing & Querying (Updated per 2026 report)
+# HTML Parsing (2026 Standard)
 scraper = "0.21"
 
-# Concurrency & State (Added per 2026 report)
+# Concurrency (2026 Standard)
 dashmap = "6.1"
 
-# Utilities (Updated per 2026 report)
+# Utilities
 uuid = { version = "1.12", features = ["v4", "serde"] }
 rand = "0.8"
 regex = "1.10"
 
-# Logging (Updated per 2026 report)
+# Logging & Observation
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
-# Error Handling (Updated per 2026 report)
 anyhow = "1.0"
 thiserror = "2.0"
 
 [build-dependencies]
-uniffi = { version = "0.28.1", features =["build"] }
+uniffi = { version = "0.28.1", features = ["build"] }
 
 [profile.release]
 opt-level = "s"
 lto = true
 strip = true
 codegen-units = 1
-
