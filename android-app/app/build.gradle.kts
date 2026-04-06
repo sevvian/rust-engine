@@ -1,8 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.mozilla.rust-android-gradle.rust-android") version "0.9.3"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
+    id("org.mozilla.rust-android-gradle.rust-android")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -56,16 +56,20 @@ android {
     }
 }
 
-rust {
-    module = "../../rust-engine"
-    libname = "rust_engine"
-    targets = listOf("arm", "arm64", "x86", "x86_64")
+// FIX: Using explicit extension configuration to avoid "Unresolved reference 'rust'"
+// and using backticks or explicit this to avoid the 'module' collision.
+extensions.configure<org.mozilla.rustandroidgradle.rust.RustContext> {
+    // Escaping 'module' with backticks prevents collision with DependencyHandler.module
+    this.`module` = "../../rust-engine"
+    this.libname = "rust_engine"
+    this.targets = listOf("arm", "arm64", "x86", "x86_64")
 }
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2023.10.01")
     implementation(composeBom)
     
+    // Standard string notation to avoid deprecation warnings
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
@@ -80,6 +84,7 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }
 
+// Ensure Rust builds before JNI/Java compilation starts
 tasks.whenTaskAdded {
     if (name == "javaPreCompileDebug" || name == "javaPreCompileRelease") {
         dependsOn("cargoBuild")
