@@ -1,6 +1,15 @@
 name: Production Build & Release
 
 on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      build_name:
+        description: 'Custom name for the build'
+        required: false
+        default: 'manual-build'
+  
+  # Automatically runs when you push a version tag (e.g., v3.3.0)
   push:
     tags:
       - 'v*'
@@ -8,6 +17,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Required permissions for creating releases and uploading assets
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout Repository
@@ -38,19 +50,22 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      - name: Sign APK (Optional - using debug for now)
+      - name: Prepare Artifact
         run: |
-          mv android-app/app/build/outputs/apk/release/app-release-unsigned.apk appt-agent-v3.3.apk || \
-          mv android-app/app/build/outputs/apk/release/app-release.apk appt-agent-v3.3.apk
+          # Try to find the generated APK regardless of build variant name
+          find android-app/app/build/outputs/apk/ -name "*.apk" -exec cp {} appt-agent-v3.3.apk \;
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          # Use the tag name if triggered by tag, otherwise use the manual input/timestamp
+          tag_name: ${{ github.ref_name == 'main' && format('manual-{0}', github.run_number) || github.ref_name }}
           files: appt-agent-v3.3.apk
-          name: Appointment Agent v3.3 Release
+          name: Appointment Agent ${{ github.event.inputs.build_name || github.ref_name }}
           body: |
-            ## High Fidelity Appointment Agent
-            - Rust Core with BoringSSL Mimicry
+            ## High Fidelity Appointment Agent Build
+            - Trigger: ${{ github.event_name }}
+            - Rust Core: BoringSSL / rquest Mimicry
             - Microsecond Precision Strike Logic
             - Android 8-16 Compatibility
             - Encrypted Credential Storage
