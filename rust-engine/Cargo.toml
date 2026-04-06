@@ -1,11 +1,11 @@
 [package]
 name = "rust-engine"
-version = "3.5.4"
+version = "3.5.5"
 edition = "2021"
 description = "High-performance native booking engine for Android"
 
 [lib]
-crate-type = ["cdylib", "staticlib"]
+crate-type =["cdylib", "staticlib"]
 name = "rust_engine"
 
 # Define the bindgen tool as a binary within the project
@@ -21,10 +21,9 @@ futures = "0.3"
 
 # Using wreq 6.0.0-rc.28 (official successor) with proper impersonation support
 wreq = { version = "6.0.0-rc.28", features =["boringssl", "socks5", "gzip", "brotli", "prefix-symbols"] }
-wreq-util = { version = "3.0.0-rc.10", features = ["emulation"] }
+wreq-util = { version = "3.0.0-rc.10", features =["emulation"] }
 
 # uniffi to latest stable version 0.30.0
-# Note: 0.30.0 has breaking changes - requires #[uniffi::trait_interface] for UDL-based traits
 uniffi = { version = "0.30.0", features = ["tokio", "cli"] }
 
 # serde and related crates
@@ -53,9 +52,11 @@ anyhow = "1.0"
 thiserror = "2.0"
 
 # regex to latest
-regex = "1.11"[build-dependencies]
+regex = "1.11"
+
+[build-dependencies]
 # uniffi build dependency
-uniffi = { version = "0.30.0", features = ["build"] }
+uniffi = { version = "0.30.0", features =["build"] }
 
 [profile.release]
 opt-level = "s"
