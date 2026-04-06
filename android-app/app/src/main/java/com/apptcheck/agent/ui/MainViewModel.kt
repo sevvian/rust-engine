@@ -10,162 +10,120 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.apptcheck.agent.data.StorageManager
+import com.apptcheck.agent.data.models.*
 import com.apptcheck.agent.scheduler.StrikeReceiver
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import rust_engine.* // Import UniFFI Rust bindings
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import rust_engine.* // Native UniFFI bindings
 
-/**
- * MainViewModel manages the UI state and orchestrates the interaction
- * between the StorageManager and the native Rust Engine.
- */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val TAG = "MainViewModel"
     private val storage = StorageManager(application)
     private val agent = BookingAgent()
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-    // Reactive UI State
-    private val _configJson = MutableStateFlow(storage.loadConfigRaw())
-    val configJson = _configJson.asStateFlow()
+    // 1. RAW STATE: The encrypted JSON string from storage
+    private val _configJsonRaw = MutableStateFlow(storage.loadConfigRaw())
+    val configJsonRaw = _configJsonRaw.asStateFlow()
 
+    // 2. PARSED STATE: Reactive AppConfig object
+    val appConfig = _configJsonRaw.map { raw ->
+        try { json.decodeFromString<AppConfig>(raw) } 
+        catch (e: Exception) { AppConfig() }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, AppConfig())
+
+    // 3. UI STATE: Which site is the user currently LOOKING at (not necessarily the active strike site)
+    private val _uiSelectedSiteId = MutableStateFlow("spl")
+    val uiSelectedSiteId = _uiSelectedSiteId.asStateFlow()
+
+    // 4. DERIVED STATE: Automatically filtered lists for the UI
+    val filteredMuseums = combine(appConfig, _uiSelectedSiteId) { config, siteId ->
+        config.sites[siteId]?.museums?.values?.toList() ?: emptyList()
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val filteredCredentials = combine(appConfig, _uiSelectedSiteId) { config, siteId ->
+        config.credentials.values.filter { it.site == siteId }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // 5. ENGINE STATE: Status from the Rust Core
     private val _engineStatus = MutableStateFlow(EngineStatus(false, "Idle", null))
     val engineStatus = _engineStatus.asStateFlow()
-
     val liveLogs = mutableStateListOf<String>()
 
     init {
         startStatusPolling()
     }
 
-    // ... inside MainViewModel ...
-private val jsonParser = Json { ignoreUnknownKeys = true }
-
-// The full parsed config object
-val appConfig = configJson.map { 
-    try { jsonParser.decodeFromString<AppConfig>(it) } 
-    catch (e: Exception) { AppConfig() } 
-}.stateIn(viewModelScope, SharingStarted.Eagerly, AppConfig())
-
-// The current site being viewed in the UI (distinct from active_site in engine)
-private val _uiSelectedSite = MutableStateFlow("spl")
-val uiSelectedSite = _uiSelectedSite.asStateFlow()
-
-// REACTIVE FILTER: Credentials belonging only to the selected site
-val filteredCredentials = combine(appConfig, uiSelectedSite) { config, site ->
-    config.credentials.values.filter { it.site == site }
-}.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-// REACTIVE FILTER: Museums belonging only to the selected site
-val filteredMuseums = combine(appConfig, uiSelectedSite) { config, site ->
-    config.sites[site]?.museums?.values?.toList() ?: emptyList()
-}.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-fun setUiSelectedSite(site: String) {
-    _uiSelectedSite.value = site
-}
-
-    /**
-     * Periodically polls the Rust Engine for status and logs.
-     * This replaces the WebSocket-based log viewer from the Go version.
-     */
     private fun startStatusPolling() {
         viewModelScope.launch {
             while (true) {
                 try {
                     val status = agent.getStatus()
                     _engineStatus.value = status
-                    
                     if (status.isRunning && status.lastLog.isNotEmpty()) {
                         if (liveLogs.isEmpty() || liveLogs.last() != status.lastLog) {
                             liveLogs.add(status.lastLog)
-                            // Keep logs manageable (last 500 lines)
                             if (liveLogs.size > 500) liveLogs.removeAt(0)
                         }
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error polling engine status: ${e.message}")
-                }
-                delay(1000) // Poll every second
+                } catch (e: Exception) { Log.e(TAG, "Polling error: ${e.message}") }
+                delay(1000)
             }
         }
     }
 
-    /**
-     * Updates and persists the configuration.
-     */
-    fun updateConfig(newJson: String) {
-        _configJson.value = newJson
-        storage.saveConfig(newJson)
+    // --- UI Actions ---
+
+    fun selectUiSite(siteId: String) {
+        _uiSelectedSiteId.value = siteId
     }
 
-    /**
-     * Schedules a strike using the Android AlarmManager.
-     * calculates the trigger time based on the pre-warm offset (Go parity).
-     */
-    fun scheduleStrike(runId: String, triggerTimeMillis: Long) {
+    fun updatePreferredMuseum(siteId: String, museumSlug: String) {
+        val current = appConfig.value
+        val site = current.sites[siteId] ?: return
+        val updatedSite = site.copy(preferredslug = museumSlug)
+        val updatedSites = current.sites.toMutableMap().apply { put(siteId, updatedSite) }
+        saveFullConfig(current.copy(sites = updatedSites))
+    }
+
+    fun saveCredential(cred: Credential) {
+        val current = appConfig.value
+        val updatedCreds = current.credentials.toMutableMap().apply { put(cred.id, cred) }
+        saveFullConfig(current.copy(credentials = updatedCreds))
+    }
+
+    fun deleteCredential(id: String) {
+        val current = appConfig.value
+        val updatedCreds = current.credentials.toMutableMap().apply { remove(id) }
+        saveFullConfig(current.copy(credentials = updatedCreds))
+    }
+
+    private fun saveFullConfig(config: AppConfig) {
+        val raw = json.encodeToString(config)
+        storage.saveConfig(raw)
+        _configJsonRaw.value = raw
+    }
+
+    fun restoreBackup(rawJson: String) {
+        storage.restoreBackup(rawJson)
+        _configJsonRaw.value = rawJson
+    }
+
+    fun scheduleStrike(runId: String, delayMs: Long) {
         val context = getApplication<Application>().applicationContext
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        
         val intent = Intent(context, StrikeReceiver::class.java).apply {
             action = "com.apptcheck.ACTION_STRIKE_ALARM"
             putExtra("RUN_ID", runId)
-            putExtra("CONFIG_JSON", _configJson.value)
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            context, 
-            runId.hashCode(), 
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Exact scheduling even in Doze mode
-        alarmManager.setExactAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            triggerTimeMillis,
-            pendingIntent
-        )
-        
-        Log.i(TAG, "Strike $runId scheduled for timestamp: $triggerTimeMillis")
-    }
-
-    /**
-     * Immediate cancellation of a run (both scheduled and active).
-     */
-    fun cancelRun(runId: String) {
-        val context = getApplication<Application>().applicationContext
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        
-        // Cancel the alarm
-        val intent = Intent(context, StrikeReceiver::class.java).apply {
-            action = "com.apptcheck.ACTION_STRIKE_ALARM"
+            putExtra("CONFIG_JSON", _configJsonRaw.value)
         }
         val pendingIntent = PendingIntent.getBroadcast(
             context, runId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        alarmManager.cancel(pendingIntent)
-
-        // Stop the Rust Engine if it's currently running this ID
-        viewModelScope.launch {
-            if (_engineStatus.value.currentRunId == runId) {
-                agent.stop()
-            }
-        }
-    }
-
-    /**
-     * Export functionality for complete backup.
-     */
-    fun getBackupPayload(): String = storage.getBackupData()
-
-    /**
-     * Restore functionality for configuration import.
-     */
-    fun restoreFromBackup(payload: String) {
-        storage.restoreBackup(payload)
-        _configJson.value = payload
+        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMs, pendingIntent)
     }
 }
