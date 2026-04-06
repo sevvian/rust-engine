@@ -11,6 +11,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
+    # 2026 Best Practice: Define global working directory for the hybrid project
+    defaults:
+      run:
+        working-directory: rust-app-main/android-app
+
     steps:
     - uses: actions/checkout@v4
 
@@ -19,7 +24,6 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
@@ -34,16 +38,20 @@ jobs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-          rust-engine/target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          rust-app-main/rust-engine/target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('rust-app-main/rust-engine/Cargo.lock') }}
 
     - name: Setup Android NDK
       uses: nttld/setup-ndk@v1
       with:
         ndk-version: r27 # 2026 Stable NDK
 
+    # FIXED: Using setup-gradle v4 which handles 'chmod +x gradlew' and caching automatically
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: wrapper
+        build-root-directory: rust-app-main/android-app
+
     - name: Build with Gradle
-      run: |
-        cd android-app
-        chmod +x gradlew
-        ./gradlew assembleDebug --stacktrace
+      run: ./gradlew assembleDebug --stacktrace
