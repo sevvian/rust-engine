@@ -1,13 +1,11 @@
-
-// Top-level build file for 2026 Rust-Android Stack
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
-    id("com.android.application") version "8.7.0" apply false
-    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+    id("com.android.application") version "8.8.0" apply false
+    id("org.jetbrains.kotlin.android") version "2.1.0" apply false
     id("org.mozilla.rust-android-gradle.rust-android") version "0.9.6" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.1.0" apply false
 }
 
-tasks.register<Delete>("clean") {
+tasks.register("clean") {
     delete(layout.buildDirectory)
 }
