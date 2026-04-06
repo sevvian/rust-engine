@@ -6,19 +6,19 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.mozilla.rust-android-gradle.rust-android")
     id("org.jetbrains.kotlin.plugin.serialization")
-    id("org.jetbrains.kotlin.plugin.compose") // New for Kotlin 2.0+
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "com.apptcheck.agent"
-    compileSdk = 35 // Updated for 2026
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.apptcheck.agent"
         minSdk = 26 
         targetSdk = 35
         versionCode = 1
-        versionName = "3.6.0"
+        versionName = "3.6.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -58,7 +58,7 @@ android {
 
 /**
  * Rust Extension Configuration
- * Uses explicit setters for Gradle 9.x compatibility
+ * Path "../../rust-engine" is correct if app is in android-app/app/
  */
 val rustExt = extensions.getByType(RustExtension::class.java)
 rustExt.setModule("../../rust-engine")
