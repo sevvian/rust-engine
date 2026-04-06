@@ -57,16 +57,14 @@ android {
 }
 
 /**
- * FIXED: Rust Configuration for Gradle 9.x
- * We use the standard 'configure' block but call the setters explicitly.
- * This avoids the 'module' vs 'DependencyHandler.module' naming collision 
- * without needing reflection.
+ * FIXED: High-Precision Rust Configuration for Gradle 9.4.1
+ * We use getByType to avoid 'Unresolved reference' errors with configure<T>.
+ * We use explicit Java setters to avoid the 'module' vs 'DependencyHandler.module' collision.
  */
-configure<org.mozilla.rustandroidgradle.rust.RustExtension> {
-    setModule("../../rust-engine")
-    setLibname("rust_engine")
-    setTargets(listOf("arm", "arm64", "x86", "x86_64"))
-}
+val rustExtension = extensions.getByType(org.mozilla.rustandroidgradle.rust.RustExtension::class.java)
+rustExtension.setModule("../../rust-engine")
+rustExtension.setLibname("rust_engine")
+rustExtension.setTargets(listOf("arm", "arm64", "x86", "x86_64"))
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2023.10.01")
@@ -86,6 +84,7 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }
 
+// Hook Rust build into Android lifecycle
 tasks.whenTaskAdded {
     if (name == "javaPreCompileDebug" || name == "javaPreCompileRelease") {
         dependsOn("cargoBuild")
