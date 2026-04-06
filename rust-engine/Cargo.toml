@@ -1,6 +1,6 @@
 [package]
 name = "rust-engine"
-version = "3.3.0"
+version = "3.5.0"
 edition = "2021"
 description = "High-performance native booking engine for Android"
 
@@ -8,13 +8,19 @@ description = "High-performance native booking engine for Android"
 crate-type = ["cdylib", "staticlib"]
 name = "rust_engine"
 
+# Option 2: Define the bindgen tool as a binary within the project
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["uniffi/cli"]
+
 [dependencies]
 tokio = { version = "1.36", features = ["full", "rt", "macros"] }
 futures = "0.3"
 rquest = { version = "0.20", features = ["boringssl", "socks5", "gzip", "brotli"] }
 
-# Downgraded to 0.24.3 for stable Android/CLI parity
-uniffi = { version = "0.24.3", features = ["tokio"] }
+# Modern 0.28.1 stack with CLI feature enabled
+uniffi = { version = "0.28.1", features = ["tokio", "cli"] }
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -28,8 +34,7 @@ thiserror = "1.0"
 regex = "1.10"
 
 [build-dependencies]
-# Build tool must match the library version exactly
-uniffi_build = "0.24.3"
+uniffi = { version = "0.28.1", features = ["build"] }
 
 [profile.release]
 opt-level = "s"
