@@ -10,15 +10,15 @@ android {
     namespace = "com.apptcheck.agent"
     compileSdk = 35
 
-    // ADDED: Explicitly specify NDK version so Gradle downloads it automatically on CI runners if missing
-    ndkVersion = "25.2.9519653"
+    // FIXED: Matched to NDK r27 per the project architecture documentation and GitHub Actions pre-installs
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.apptcheck.agent"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "3.5.4"
+        versionCode = 4
+        versionName = "3.5.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
