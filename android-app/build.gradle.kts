@@ -1,4 +1,4 @@
-//--- START OF FILE rust-app-main/android-app/build.gradle.kts ---
+
 // Top-level build file for 2026 Rust-Android Stack
 plugins {
     id("com.android.application") version "8.7.0" apply false
@@ -11,4 +11,3 @@ plugins {
 tasks.register<Delete>("clean") {
     delete(layout.buildDirectory)
 }
-//--- END OF FILE rust-app-main/android-app/build.gradle.kts ---
