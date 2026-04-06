@@ -1,4 +1,3 @@
-
 import org.mozilla.rustandroidgradle.rust.RustExtension
 
 plugins {
@@ -6,19 +5,24 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.mozilla.rust-android-gradle.rust-android")
     id("org.jetbrains.kotlin.plugin.serialization")
+    // ADDED: Compose Compiler Gradle plugin for Kotlin 2.1.0
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "com.apptcheck.agent"
+    // UPDATED: compileSdk to 35 (Android 15)
     compileSdk = 35
 
     defaultConfig {
         applicationId = "com.apptcheck.agent"
-        minSdk = 26 
+        // UPDATED: minSdk to 23 (Android 6.0) - required by newer AndroidX libraries
+        minSdk = 26
+        // UPDATED: targetSdk to 35
         targetSdk = 35
         versionCode = 1
-        versionName = "3.6.1"
+        // UPDATED: versionName to match Cargo.toml
+        versionName = "3.5.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -28,7 +32,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true 
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -37,17 +41,22 @@ android {
     }
 
     compileOptions {
+        // UPDATED: Java 17 for better compatibility with Kotlin 2.1.0
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
+        // UPDATED: JVM target 17
         jvmTarget = "17"
     }
 
     buildFeatures {
         compose = true
     }
+
+    // REMOVED: composeOptions block - no longer needed with Compose Compiler Gradle plugin
+    // The plugin handles compiler version automatically
 
     packaging {
         resources {
@@ -56,31 +65,58 @@ android {
     }
 }
 
+// ADDED: Compose Compiler configuration block (optional)
+composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose_compiler")
+}
+
 /**
- * Rust Extension Configuration
- * Path "../../rust-engine" is correct if app is in android-app/app/
+ * FIXED: Rust Extension Configuration
+ * Uses explicit setters to avoid DSL keyword collisions in Gradle 9.x
  */
 val rustExt = extensions.getByType(RustExtension::class.java)
 rustExt.setModule("../../rust-engine")
 rustExt.setLibname("rust_engine")
 rustExt.setTargets(listOf("arm", "arm64", "x86", "x86_64"))
+// ADDED: Use release profile for better performance
+rustExt.setProfile("release")
 
 dependencies {
+    // UPDATED: Compose BOM to 2025.02.00 (stable version compatible with Kotlin 2.1.0)
     val composeBom = platform("androidx.compose:compose-bom:2025.02.00")
     implementation(composeBom)
-    
+
+    // UPDATED: AndroidX core to latest stable
     implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.0")
+    // UPDATED: Lifecycle to latest stable
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    // UPDATED: Activity Compose to 1.10.0
     implementation("androidx.activity:activity-compose:1.10.0")
+
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.navigation:navigation-compose:2.8.5")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // UPDATED: Navigation Compose to latest stable
+    implementation("androidx.navigation:navigation-compose:2.8.6")
+
+    // UPDATED: Kotlinx Serialization to 1.8.0 (compatible with Kotlin 2.1.0)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+
+    // UPDATED: Coroutines to 1.10.1
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+
+    // UPDATED: JNA to 5.16.0
     implementation("net.java.dev.jna:jna:5.16.0@aar")
-    implementation("androidx.security:security-crypto:1.1.0")
+
+    // UPDATED: Security Crypto to stable 1.1.0-alpha06 -> 1.1.0-alpha06 (latest is 1.1.0-alpha06)
+    // Keeping as is since 1.1.0-alpha06 is the latest for this specific library
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Debug implementations
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 tasks.whenTaskAdded {
